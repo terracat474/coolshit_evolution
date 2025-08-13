@@ -34,7 +34,6 @@ local function stompDamage(npc, radius, damage, damageType)
 end
 
 local function evo3stomp(npc)
-    print("STOMP!")
     npc:SetSaveValue("m_flNextDecisionTime", 1)
     npc:ResetSequence("tantrum")
 
@@ -58,9 +57,9 @@ local function evolve(npc)
             npc.EvolveTier = 2 --tier 2 evo
             npc:SetNWInt("EvolveTier", npc.EvolveTier)
 
-            npc:SetModelScale(npc:GetModelScale() * 2, 1)
+            --npc:SetModelScale(npc:GetModelScale() * 2, 1)
             npc:SetColor(Color(29, 232, 19))
-            npc:SetHealth(npc:GetMaxHealth() * 2)
+            npc:SetHealth(npc:GetMaxHealth() * 3)
 
             timer.Create("EffectTimerEvo2_"..npc:EntIndex(), 2, 0, function()
                 if IsValid(npc) then
@@ -78,29 +77,9 @@ local function evolve(npc)
             npc.EvolveTier = 3 --tier 3 evo
             npc:SetNWInt("EvolveTier", npc.EvolveTier)
 
-            npc:SetModelScale(npc:GetModelScale() * 3, 1)
+            npc:SetModelScale(npc:GetModelScale() * 1.25, 1)
             npc:SetColor(Color(232, 0, 19))
             npc:SetHealth(npc:GetMaxHealth() * 7)
-
-            --timer.Create("EffectTimerEvo3_"..npc:EntIndex(), 1, 0, function()
-            --    print("SOMETHIGN!!")
-            --    if IsValid(npc) then
-            --        print(IsValid(npc))
-            --        for k, v in ipairs(ents.FindByClass("npc_*")) do
-            --            if string.find(v:GetClass(), "zombie") == nil and string.find(v:GetClass(), "crab") == nil then
-            --                if checkdist(npc, v, 50) and v:EntIndex() != npc:EntIndex() then
-            --                    print(v:EntIndex())
-            --                    print(npc:EntIndex())
-            --                    print("bro's stomping")
-            --                    evo3stomp(npc)
-            --                    break
-            --                end
-            --            end
-            --        end
-            --    else
-            --        timer.Remove("EffectTimerEvo3_"..npc:EntIndex())
-            --    end
-            --end)
 
             timer.Remove("EffectTimerEvo2_"..npc:EntIndex())
         end
@@ -127,19 +106,17 @@ local function checkBlacklist(whatever)
 end
 
 local function checkStomps(npc)
-    local cunts = ents.GetAll()
+    local cunts = ents.FindByClass("npc_*")
     for k, v in ipairs(cunts) do
-        if v:IsNPC() and checkBlacklist(v:GetClass()) then
+        if v:IsNPC() and !checkBlacklist(v:GetClass()) then
             if checkdist(npc, v, 200) and v:EntIndex() != npc:EntIndex() then
-                print(v:EntIndex())
-                print(npc:EntIndex())
                 evo3stomp(npc)
             end
         end
     end
 end
 
-hook.Add("Think", "stomps", function()
+hook.Add("Think", "stompscheck", function()
     local meow = ents.GetAll()
     if CurTime() >= thcd then
         for k,v in ipairs(meow) do
@@ -169,24 +146,29 @@ hook.Add( "OnNPCKilled", "evolvebrah", function( npc, attacker, inflictor )
         evolve(attacker)
     end
     --so they dont ragdoll and just... self-explanatory
-    if npc.EvolveTier >= 2 then
+    if npc.EvolveTier and npc.EvolveTier >= 2 then
         local pos = npc:GetPos()
         npc:Remove()
-        explodeInViscera(pos, 10)
+        explodeInViscera(pos, npc.EvolveTier * 20)
     end
 end)
 --zombifications give kills
-hook.Add("headcrabtakeovershouldntzombine", "evolveheadcrabtakeover", function(victim, infector)
+--hook.Add("headcrabtakeovershouldntzombine", "evolveheadcrabtakeover", function(victim, infector)
+--    if string.find(infector:GetClass(), "zombie") or string.find(infector:GetClass(), "zombine") then
+--        evolve(infector)
+--    end
+--    if infector.EvolveTier == 3 then
+--        return true
+--    end
+--    return false
+--end)
+--stomps dont zombify with headcrabtakeover
+hook.Add("headcrabtakeoverbeforecreatezombiehook", "evolveheadcrabtakeover", function(target, damage)
+    local infector = damage:GetAttacker()
     if string.find(infector:GetClass(), "zombie") or string.find(infector:GetClass(), "zombine") then
         evolve(infector)
     end
-    if infector.EvolveTier == 3 then
-        return true
-    end
-    return false
-end)
---stomps dont zombify with headcrabtakeover
-hook.Add("headcrabtakeoverbeforecreatezombiehook", "evolveheadcrabtakeover", function(victim, infector)
+
     if infector.EvolveTier == 3 then
         return false
     end
@@ -194,6 +176,7 @@ end)
 --apply effects for testing
 concommand.Add("terra_applyeffect", function( ply, cmd, args, argStr )
     local uc = ply:GetEyeTrace().HitPos
+    local npc = ply:GetEyeTrace().Entity
     if argStr == nil then
         print("[terra] Provide an effect name!")
     else
@@ -202,21 +185,25 @@ concommand.Add("terra_applyeffect", function( ply, cmd, args, argStr )
         effectdata:SetOrigin(vPoint)
         effectdata:SetFlags(3)
         effectdata:SetScale(10)
+        effectdata:SetMagnitude(10)
+        if npc != nil then
+            effectdata:SetEntity(npc)
+        end
         timer.Simple(1.5, function() util.Effect( argStr, effectdata ) end)
     end
 end)
 --evolve for testing
-concommand.Add("terra_evolvenpctest", function( ply, cmd, args, argStr )
-    local uc = ply:GetEyeTrace().Entity
-    if uc:IsNPC() then
-        evolve(uc)
-        uc.Kills = uc.Kills + 1
-    end
-end)
---getheight
-concommand.Add("terra_getheight", function( ply, cmd, args, argStr )
-    local uc = ply:GetEyeTrace().Entity
-    if uc:IsNPC() then
-        print(uc:BoundingRadius())
-    end
-end)
+--concommand.Add("terra_evolvenpctest", function( ply, cmd, args, argStr )
+--    local uc = ply:GetEyeTrace().Entity
+--    if uc:IsNPC() then
+--        evolve(uc)
+--        uc.Kills = uc.Kills + 1
+--    end           --these are for testing, u can enable these
+--end)
+----getheight
+--concommand.Add("terra_getheight", function( ply, cmd, args, argStr )
+--    local uc = ply:GetEyeTrace().Entity
+--    if uc:IsNPC() then
+--        print(uc:BoundingRadius())
+--    end
+--end)
